@@ -13,39 +13,42 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ======== 全台縣市 map（英文 → CWA 中文）===========
-const cityMap = {
-  taipei: "臺北市",
-  newtaipei: "新北市",
-  taoyuan: "桃園市",
-  hsinchu: "新竹市",
-  hsincounty: "新竹縣",
-  miaoli: "苗栗縣",
-  taichung: "臺中市",
-  changhua: "彰化縣",
-  nantou: "南投縣",
-  yunlin: "雲林縣",
-  chiayi: "嘉義市",
-  chiayicounty: "嘉義縣",
-  tainan: "臺南市",
-  kaohsiung: "高雄市",
-  pingtung: "屏東縣",
-  ilan: "宜蘭縣",
-  hualien: "花蓮縣",
-  taitung: "臺東縣",
-  keelung: "基隆市",
-};
+// 允許中央氣象署支持的 22 個地名
+const validCities = [
+  "臺北市",
+  "新北市",
+  "桃園市",
+  "臺中市",
+  "臺南市",
+  "高雄市",
+  "基隆市",
+  "新竹市",
+  "新竹縣",
+  "苗栗縣",
+  "彰化縣",
+  "南投縣",
+  "雲林縣",
+  "嘉義市",
+  "嘉義縣",
+  "屏東縣",
+  "宜蘭縣",
+  "花蓮縣",
+  "臺東縣",
+  "澎湖縣",
+  "金門縣",
+  "連江縣",
+];
 
-// ======== 主函式：抓任意縣市天氣 ===========
+// ======== 主函式：直接用中文抓天氣 ===========
+
 const getWeatherData = async (req, res) => {
   try {
-    const cityCode = req.params.city.toLowerCase();
-    const cityName = cityMap[cityCode];
+    const cityName = decodeURIComponent(req.params.city);
 
-    if (!cityName) {
+    if (!validCities.includes(cityName)) {
       return res.status(400).json({
         success: false,
-        message: `不支援的縣市代碼：${cityCode}`,
+        message: `不支援的縣市名稱：${cityName}`,
       });
     }
 
@@ -56,7 +59,7 @@ const getWeatherData = async (req, res) => {
       });
     }
 
-    // 呼叫 CWA API
+    // 呼叫中央氣象署 API
     const response = await axios.get(
       `${CWA_API_BASE_URL}/v1/rest/datastore/F-C0032-001`,
       {
@@ -75,7 +78,6 @@ const getWeatherData = async (req, res) => {
       });
     }
 
-    // 組成前端格式
     const result = {
       city: locationData.locationName,
       updateTime: response.data.records.datasetDescription,
@@ -128,7 +130,6 @@ const getWeatherData = async (req, res) => {
     res.json({ success: true, data: result });
   } catch (err) {
     console.error("取得天氣錯誤：", err.message);
-
     res.status(500).json({
       success: false,
       message: "伺服器取得天氣資料失敗",
@@ -137,14 +138,12 @@ const getWeatherData = async (req, res) => {
 };
 
 // ======== 路由 ==========
-
-// 全縣市通用 API
 app.get("/api/weather/:city", getWeatherData);
 
 app.get("/", (req, res) => {
   res.json({
-    message: "CWA 天氣 API",
-    example: "/api/weather/kaohsiung",
+    message: "CWA 天氣 API（中文城市版）",
+    example: "/api/weather/高雄市",
   });
 });
 
