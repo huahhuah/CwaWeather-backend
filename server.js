@@ -13,7 +13,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 允許中央氣象署支持的 22 個地名
+// 支援全台 22 縣市
 const validCities = [
   "臺北市",
   "新北市",
@@ -39,16 +39,17 @@ const validCities = [
   "連江縣",
 ];
 
-// ======== 主函式：直接用中文抓天氣 ===========
-
-const getWeatherData = async (req, res) => {
+app.get("/api/weather/:city", async (req, res) => {
   try {
+    //  將URI編碼還原，例如 %E9%AB%98 → 高
     const cityName = decodeURIComponent(req.params.city);
+
+    console.log("📥 前端請求城市：", req.params.city, "→ 解析後：", cityName);
 
     if (!validCities.includes(cityName)) {
       return res.status(400).json({
         success: false,
-        message: `不支援的縣市名稱：${cityName}`,
+        message: `不支援的縣市：${cityName}`,
       });
     }
 
@@ -59,7 +60,7 @@ const getWeatherData = async (req, res) => {
       });
     }
 
-    // 呼叫中央氣象署 API
+    // ✔ 呼叫中央氣象署 API
     const response = await axios.get(
       `${CWA_API_BASE_URL}/v1/rest/datastore/F-C0032-001`,
       {
@@ -129,22 +130,16 @@ const getWeatherData = async (req, res) => {
 
     res.json({ success: true, data: result });
   } catch (err) {
-    console.error("取得天氣錯誤：", err.message);
+    console.error("❌ 取得天氣錯誤：", err.message);
     res.status(500).json({
       success: false,
       message: "伺服器取得天氣資料失敗",
     });
   }
-};
-
-// ======== 路由 ==========
-app.get("/api/weather/:city", getWeatherData);
+});
 
 app.get("/", (req, res) => {
-  res.json({
-    message: "CWA 天氣 API（中文城市版）",
-    example: "/api/weather/高雄市",
-  });
+  res.json({ message: "CWA 天氣 API（中文城市）" });
 });
 
 app.listen(PORT, () => {
