@@ -13,54 +13,54 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 支援全台 22 縣市
-const validCities = [
-  "臺北市",
-  "新北市",
-  "桃園市",
-  "臺中市",
-  "臺南市",
-  "高雄市",
-  "基隆市",
-  "新竹市",
-  "新竹縣",
-  "苗栗縣",
-  "彰化縣",
-  "南投縣",
-  "雲林縣",
-  "嘉義市",
-  "嘉義縣",
-  "屏東縣",
-  "宜蘭縣",
-  "花蓮縣",
-  "臺東縣",
-  "澎湖縣",
-  "金門縣",
-  "連江縣",
-];
+// ======== 英文 slug → 中文縣市 ========
+const cityMap = {
+  taipei: "臺北市",
+  newtaipei: "新北市",
+  taoyuan: "桃園市",
+  taichung: "臺中市",
+  tainan: "臺南市",
+  kaohsiung: "高雄市",
+  keelung: "基隆市",
+  hsinchu: "新竹市",
+  hsinchucounty: "新竹縣",
+  miaoli: "苗栗縣",
+  changhua: "彰化縣",
+  nantou: "南投縣",
+  yunlin: "雲林縣",
+  chiayi: "嘉義市",
+  chiayicounty: "嘉義縣",
+  pingtung: "屏東縣",
+  ilan: "宜蘭縣",
+  hualien: "花蓮縣",
+  taitung: "臺東縣",
+  penghu: "澎湖縣",
+  kinmen: "金門縣",
+  lienchiang: "連江縣",
+};
 
+// ======== 主 API ========
 app.get("/api/weather/:city", async (req, res) => {
   try {
-    //  將URI編碼還原，例如 %E9%AB%98 → 高
-    const cityName = decodeURIComponent(req.params.city);
+    const slug = req.params.city.toLowerCase();
+    const cityName = cityMap[slug];
 
-    console.log("📥 前端請求城市：", req.params.city, "→ 解析後：", cityName);
+    console.log("前端傳入 slug：", slug, "→ 轉換為：", cityName);
 
-    if (!validCities.includes(cityName)) {
+    if (!cityName) {
       return res.status(400).json({
         success: false,
-        message: `不支援的縣市：${cityName}`,
+        message: `不支援的城市代碼：${slug}`,
       });
     }
 
     if (!CWA_API_KEY) {
       return res.status(500).json({
         success: false,
-        message: "CWA_API_KEY 尚未設定",
+        message: "CWA_API_KEY 未設定",
       });
     }
 
-    // ✔ 呼叫中央氣象署 API
     const response = await axios.get(
       `${CWA_API_BASE_URL}/v1/rest/datastore/F-C0032-001`,
       {
@@ -75,7 +75,7 @@ app.get("/api/weather/:city", async (req, res) => {
     if (!locationData) {
       return res.status(404).json({
         success: false,
-        message: `查無 ${cityName} 天氣資料`,
+        message: `查無 ${cityName} 資料`,
       });
     }
 
@@ -86,9 +86,9 @@ app.get("/api/weather/:city", async (req, res) => {
     };
 
     const elements = locationData.weatherElement;
-    const timeCount = elements[0].time.length;
+    const count = elements[0].time.length;
 
-    for (let i = 0; i < timeCount; i++) {
+    for (let i = 0; i < count; i++) {
       const f = {
         startTime: elements[0].time[i].startTime,
         endTime: elements[0].time[i].endTime,
@@ -101,26 +101,26 @@ app.get("/api/weather/:city", async (req, res) => {
       };
 
       elements.forEach((e) => {
-        const value = e.time[i].parameter;
+        const v = e.time[i].parameter;
 
         switch (e.elementName) {
           case "Wx":
-            f.weather = value.parameterName;
+            f.weather = v.parameterName;
             break;
           case "PoP":
-            f.rain = value.parameterName + "%";
+            f.rain = v.parameterName + "%";
             break;
           case "MinT":
-            f.minTemp = value.parameterName + "°C";
+            f.minTemp = v.parameterName + "°C";
             break;
           case "MaxT":
-            f.maxTemp = value.parameterName + "°C";
+            f.maxTemp = v.parameterName + "°C";
             break;
           case "CI":
-            f.comfort = value.parameterName;
+            f.comfort = v.parameterName;
             break;
           case "WS":
-            f.windSpeed = value.parameterName;
+            f.windSpeed = v.parameterName;
             break;
         }
       });
@@ -130,16 +130,19 @@ app.get("/api/weather/:city", async (req, res) => {
 
     res.json({ success: true, data: result });
   } catch (err) {
-    console.error("❌ 取得天氣錯誤：", err.message);
+    console.error("取得天氣失敗：", err.message);
     res.status(500).json({
       success: false,
-      message: "伺服器取得天氣資料失敗",
+      message: "伺服器錯誤",
     });
   }
 });
 
-app.get("/", (req, res) => {
-  res.json({ message: "CWA 天氣 API（中文城市）" });
+app.get("/", (_, res) => {
+  res.json({
+    message: "CWA 天氣 API（英文 slug 版本）",
+    usage: "/api/weather/kaohsiung",
+  });
 });
 
 app.listen(PORT, () => {
